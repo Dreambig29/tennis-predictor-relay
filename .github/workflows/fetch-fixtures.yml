@@ -1,0 +1,36 @@
+name: Fetch ATP Fixtures
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch upcoming ATP fixtures
+        env:
+          LIVE_TENNIS_API_KEY: ${{ secrets.LIVE_TENNIS_API_KEY }}
+        run: |
+          curl -sS -f -H "Authorization: Bearer $LIVE_TENNIS_API_KEY" \
+            "https://api.livetennisapi.com/api/public/v1/matches?status=upcoming&tour=atp" \
+            -o fixtures.json
+          echo "Fetched $(wc -c < fixtures.json) bytes"
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "fixtures-bot"
+          git config user.email "actions@github.com"
+          git add fixtures.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update fixtures $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          fi
